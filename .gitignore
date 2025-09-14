@@ -1,0 +1,33 @@
+# AWS Credentials
+.aws/
+*.pem
+*.key
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# MacOS
+.DS_Store
+
+# VS Code
+.vscode/settings.json
+
+# Sensitive files
+secrets/
+private/
+credentials/
+
