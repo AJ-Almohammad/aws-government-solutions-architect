@@ -8,7 +8,6 @@ architecture delivers $27,200/month savings (40% cost reduction) while
 improving performance, security, and scalability.
 
 ## Current State vs. Proposed Architecture Costs
-
 ### Monthly Cost Comparison
 
 | Component | Current State | Proposed Architecture | Monthly Savings | 
