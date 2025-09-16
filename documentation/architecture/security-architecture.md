@@ -9,7 +9,7 @@ Framework, and federal government security standards.
 
 ## Security Architecture Diagram
 
-![Security Architecture](images/security_architecture.png)
+![Security Architecture](images/security_architecture_1.png)
 
 ## Defense in Depth Strategy
 
