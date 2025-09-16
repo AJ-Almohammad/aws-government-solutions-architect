@@ -11,6 +11,7 @@ improving performance, security, and scalability.
 
 ### Monthly Cost Comparison
 
+
 | Component | Current State | Proposed Architecture | Monthly Savings | 
 Savings % |
 |-----------|---------------|----------------------|-----------------|-----------|
@@ -20,6 +21,7 @@ Savings % |
 | Network & CDN | $10,000 | $6,200 | $3,800 | 38% |
 | Security Services | $0 | $4,500 | -$4,500 | New investment |
 | **TOTAL** | **$68,000** | **$45,700** | **$22,300** | **33%** |
+
 
 ### Annual Impact Analysis
 - **Total Annual Savings:** $267,600
