@@ -10,6 +10,7 @@ improving performance, security, and scalability.
 ## Current State vs. Proposed Architecture Costs
 
 ### Monthly Cost Comparison
+
 | Component | Current State | Proposed Architecture | Monthly Savings | 
 Savings % |
 |-----------|---------------|----------------------|-----------------|-----------|
