@@ -4,17 +4,16 @@
 
 This document provides detailed cost analysis for the Department of 
 Citizen Services cloud modernization project. The proposed AWS 
-architecture delivers **$27,200/month savings (40% cost reduction)** while 
+architecture delivers $27,200/month savings (40% cost reduction) while 
 improving performance, security, and scalability.
 
 ## Current State vs. Proposed Architecture Costs
 
 ### Monthly Cost Comparison
 
-
 | Component | Current State | Proposed Architecture | Monthly Savings | 
 Savings % |
-|-----------|---------------|----------------------|-----------------|-----------|
+| --- | --- | --- | --- | --- |
 | Compute Infrastructure | $25,000 | $15,000 | $10,000 | 40% |
 | Storage Systems | $18,000 | $12,000 | $6,000 | 33% |
 | Database Services | $15,000 | $8,000 | $7,000 | 47% |
@@ -22,8 +21,8 @@ Savings % |
 | Security Services | $0 | $4,500 | -$4,500 | New investment |
 | **TOTAL** | **$68,000** | **$45,700** | **$22,300** | **33%** |
 
-
 ### Annual Impact Analysis
+
 - **Total Annual Savings:** $267,600
 - **3-Year Savings:** $802,800
 - **5-Year Savings:** $1,338,000
@@ -35,8 +34,9 @@ Savings % |
 ### Compute Services (EC2, Auto Scaling, Load Balancers)
 
 #### Production Environment
+
 | Service | Instance Type | Quantity | Unit Cost | Monthly Total |
-|---------|---------------|----------|-----------|---------------|
+| --- | --- | --- | --- | --- |
 | Application Load Balancer | ALB | 1 | $22.50 | $22.50 |
 | Web Tier - Reserved Instances | t3.large | 4 | $38.59 | $154.36 |
 | App Tier - Reserved Instances | c5.xlarge | 4 | $69.35 | $277.40 |
@@ -46,8 +46,9 @@ $300.00 |
 | **Compute Subtotal** | | | | **$762.73** |
 
 #### Development/Staging Environment
+
 | Service | Instance Type | Quantity | Unit Cost | Monthly Total |
-|---------|---------------|----------|-----------|---------------|
+| --- | --- | --- | --- | --- |
 | Dev/Test Environment | t3.medium | 6 | $30.37 | $182.22 |
 | **Dev/Test Subtotal** | | | | **$182.22** |
 
@@ -56,8 +57,9 @@ $300.00 |
 ### Database Services (RDS, ElastiCache)
 
 #### Production Database Configuration
+
 | Service | Configuration | Specifications | Monthly Cost |
-|---------|---------------|----------------|--------------|
+| --- | --- | --- | --- |
 | RDS PostgreSQL Multi-AZ | db.r5.xlarge | 4 vCPU, 32GB RAM | $445.44 |
 | Read Replica (2 instances) | db.r5.large | 2 vCPU, 16GB RAM each | 
 $222.72 |
@@ -69,8 +71,9 @@ $222.72 |
 ### Storage Services (S3, EBS, EFS)
 
 #### S3 Storage Configuration
+
 | Storage Class | Usage | Volume | Unit Cost | Monthly Cost |
-|---------------|--------|---------|-----------|--------------|
+| --- | --- | --- | --- | --- |
 | S3 Standard | Active documents | 500GB | $0.023/GB | $11.50 |
 | S3 Standard-IA | Archived documents | 2TB | $0.0125/GB | $25.60 |
 | S3 Glacier | Long-term archive | 10TB | $0.004/GB | $40.96 |
@@ -78,8 +81,9 @@ $222.72 |
 | **S3 Subtotal** | | | | **$82.06** |
 
 #### EBS and EFS Storage
+
 | Service | Volume | Performance | Monthly Cost |
-|---------|--------|-------------|--------------|
+| --- | --- | --- | --- |
 | EBS gp3 (OS drives) | 1TB total | 3,000 IOPS | $80.00 |
 | EBS gp3 (Application data) | 500GB | 3,000 IOPS | $40.00 |
 | EFS Standard | 200GB shared | Standard performance | $60.00 |
@@ -90,8 +94,9 @@ $222.72 |
 ### Network Services (VPC, CloudFront, Data Transfer)
 
 #### Networking Infrastructure
+
 | Service | Configuration | Volume/Usage | Monthly Cost |
-|---------|---------------|--------------|--------------|
+| --- | --- | --- | --- |
 | NAT Gateways (3 AZs) | High Availability | 3 gateways | $98.55 |
 | VPC Endpoints | 6 interface endpoints | $7.30 each | $43.80 |
 | CloudFront CDN | Global distribution | 1TB transfer | $85.00 |
@@ -102,8 +107,9 @@ $222.72 |
 ### Security Services
 
 #### AWS Security Stack
+
 | Service | Configuration | Coverage | Monthly Cost |
-|---------|---------------|----------|--------------|
+| --- | --- | --- | --- |
 | GuardDuty | All regions | Threat detection | $150.00 |
 | Security Hub | Central dashboard | All findings | $50.00 |
 | CloudTrail | Multi-region logging | Data events | $75.00 |
@@ -115,8 +121,9 @@ $222.72 |
 ### Serverless Services (Lambda, API Gateway)
 
 #### Serverless Components
+
 | Service | Usage Volume | Unit Cost | Monthly Cost |
-|---------|--------------|-----------|--------------|
+| --- | --- | --- | --- |
 | Lambda Functions | 50M requests | $0.20/1M requests | $10.00 |
 | Lambda Duration | 500M GB-seconds | $0.0000166667/GB-sec | $8.33 |
 | API Gateway | 50M requests | $3.50/1M requests | $175.00 |
@@ -154,8 +161,9 @@ $222.72 |
 ## Budget Allocation by Department Function
 
 ### Operational Expenses (OpEx) Breakdown
+
 | Function | Monthly Budget | Annual Budget | Percentage |
-|----------|----------------|---------------|------------|
+| --- | --- | --- | --- |
 | Application Hosting | $15,000 | $180,000 | 33% |
 | Data Management | $12,000 | $144,000 | 26% |
 | Security & Compliance | $8,000 | $96,000 | 18% |
@@ -174,8 +182,9 @@ $222.72 |
   - 100% of budget: Automatic resource scaling limitations
 
 ### Cost Allocation Tags
+
 | Tag Key | Purpose | Responsibility |
-|---------|---------|----------------|
+| --- | --- | --- |
 | Department | Cost center allocation | Finance Team |
 | Environment | Prod/Dev/Test separation | DevOps Team |
 | Project | Feature-based costing | Project Managers |
@@ -193,15 +202,17 @@ $222.72 |
 ### Growth Scenario Planning
 
 #### Scenario 1: Normal Growth (20% annually)
+
 | Year | Monthly Cost | Annual Cost | Cumulative Savings |
-|------|--------------|-------------|-------------------|
+| --- | --- | --- | --- |
 | Year 1 | $45,700 | $548,400 | $267,600 |
 | Year 2 | $54,840 | $658,080 | $427,920 |
 | Year 3 | $65,808 | $789,696 | $562,704 |
 
 #### Scenario 2: Rapid Growth (50% annually)
+
 | Year | Monthly Cost | Annual Cost | Cumulative Savings |
-|------|--------------|-------------|-------------------|
+| --- | --- | --- | --- |
 | Year 1 | $45,700 | $548,400 | $267,600 |
 | Year 2 | $68,550 | $822,600 | $257,400 |
 | Year 3 | $102,825 | $1,233,900 | $66,100 |
@@ -229,8 +240,9 @@ $222.72 |
 ## Risk Assessment and Cost Contingencies
 
 ### Financial Risk Mitigation
+
 | Risk Factor | Probability | Impact | Mitigation Strategy | Cost Buffer |
-|-------------|-------------|--------|-------------------|-------------|
+| --- | --- | --- | --- | --- |
 | Usage spike | Medium | High | Auto-scaling with limits | $5,000/month |
 | Data transfer surge | Low | Medium | CloudFront optimization | 
 $2,000/month |
@@ -246,8 +258,9 @@ $1,500/month |
 ## Competitive Cost Analysis
 
 ### AWS vs. Other Cloud Providers
+
 | Provider | Monthly Estimate | Annual Cost | Difference from AWS |
-|----------|------------------|-------------|-------------------|
+| --- | --- | --- | --- |
 | AWS (Our Solution) | $45,700 | $548,400 | Baseline |
 | Microsoft Azure | $52,300 | $627,600 | +$79,200 (14% more) |
 | Google Cloud | $48,900 | $586,800 | +$38,400 (7% more) |
@@ -263,8 +276,9 @@ $1,500/month |
 ## Implementation Cost Schedule
 
 ### Phase-by-Phase Investment
+
 | Phase | Duration | AWS Costs | Services Costs | Total Investment |
-|-------|----------|-----------|---------------|-----------------|
+| --- | --- | --- | --- | --- |
 | Phase 1: Foundation | Week 1-2 | $5,000 | $15,000 | $20,000 |
 | Phase 2: Core Infrastructure | Week 3-4 | $12,000 | $25,000 | $37,000 |
 | Phase 3: Security Implementation | Week 5-6 | $8,500 | $20,000 | $28,500 
