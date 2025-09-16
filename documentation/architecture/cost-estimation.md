@@ -8,17 +8,64 @@ architecture delivers $27,200/month savings (40% cost reduction) while
 improving performance, security, and scalability.
 
 ## Current State vs. Proposed Architecture Costs
+
 ### Monthly Cost Comparison
 
-| Component | Current State | Proposed Architecture | Monthly Savings | 
-Savings % |
-| --- | --- | --- | --- | --- |
-| Compute Infrastructure | $25,000 | $15,000 | $10,000 | 40% |
-| Storage Systems | $18,000 | $12,000 | $6,000 | 33% |
-| Database Services | $15,000 | $8,000 | $7,000 | 47% |
-| Network & CDN | $10,000 | $6,200 | $3,800 | 38% |
-| Security Services | $0 | $4,500 | -$4,500 | New investment |
-| **TOTAL** | **$68,000** | **$45,700** | **$22,300** | **33%** |
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Current State</th>
+<th>Proposed Architecture</th>
+<th>Monthly Savings</th>
+<th>Savings %</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compute Infrastructure</td>
+<td>$25,000</td>
+<td>$15,000</td>
+<td>$10,000</td>
+<td>40%</td>
+</tr>
+<tr>
+<td>Storage Systems</td>
+<td>$18,000</td>
+<td>$12,000</td>
+<td>$6,000</td>
+<td>33%</td>
+</tr>
+<tr>
+<td>Database Services</td>
+<td>$15,000</td>
+<td>$8,000</td>
+<td>$7,000</td>
+<td>47%</td>
+</tr>
+<tr>
+<td>Network & CDN</td>
+<td>$10,000</td>
+<td>$6,200</td>
+<td>$3,800</td>
+<td>38%</td>
+</tr>
+<tr>
+<td>Security Services</td>
+<td>$0</td>
+<td>$4,500</td>
+<td>-$4,500</td>
+<td>New investment</td>
+</tr>
+<tr>
+<td><strong>TOTAL</strong></td>
+<td><strong>$68,000</strong></td>
+<td><strong>$45,700</strong></td>
+<td><strong>$22,300</strong></td>
+<td><strong>33%</strong></td>
+</tr>
+</tbody>
+</table>
 
 ### Annual Impact Analysis
 
