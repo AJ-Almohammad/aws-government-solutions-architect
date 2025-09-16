@@ -31,3 +31,6 @@ secrets/
 private/
 credentials/
 
+# Temporary conversion tools
+server.js
+documentation/architecture/server.js
