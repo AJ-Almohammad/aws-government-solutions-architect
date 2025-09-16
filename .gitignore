@@ -34,3 +34,5 @@ credentials/
 # Temporary conversion tools
 server.js
 documentation/architecture/server.js
+*.temp
+server.js
