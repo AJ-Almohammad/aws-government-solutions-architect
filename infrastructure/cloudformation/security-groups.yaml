@@ -1,0 +1,176 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Government Solutions Security Groups - Defense-in-Depth Architecture'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'gov-solutions'
+    Description: 'Project name for resource tagging'
+  
+  Environment:
+    Type: String
+    Default: 'demo'
+    AllowedValues: ['dev', 'staging', 'prod', 'demo']
+    Description: 'Environment name'
+
+Resources:
+  # Application Load Balancer Security Group
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${Environment}-alb-sg'
+      GroupDescription: 'Security group for Application Load Balancer'
+      VpcId: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTP from internet'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTPS from internet'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-alb-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Load Balancer'
+
+  # Web Server Security Group
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${Environment}-web-sg'
+      GroupDescription: 'Security group for Web Servers'
+      VpcId: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+          Description: 'HTTP from ALB'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+          Description: 'SSH from bastion host'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-web-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Web'
+
+  # Application Server Security Group
+  AppServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${Environment}-app-sg'
+      GroupDescription: 'Security group for Application Servers'
+      VpcId: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref WebServerSecurityGroup
+          Description: 'Application port from web servers'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+          Description: 'SSH from bastion host'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-app-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Application'
+
+  # Database Security Group
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${Environment}-db-sg'
+      GroupDescription: 'Security group for Database'
+      VpcId: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
+          Description: 'PostgreSQL from application servers'
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref BastionSecurityGroup
+          Description: 'PostgreSQL from bastion host'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-db-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Database'
+
+  # Bastion Host Security Group
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${ProjectName}-${Environment}-bastion-sg'
+      GroupDescription: 'Security group for Bastion Host'
+      VpcId: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: 'SSH from internet (restrict in production)'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-bastion-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: 'Management'
+
+Outputs:
+  ALBSecurityGroupId:
+    Description: Application Load Balancer Security Group ID
+    Value: !Ref ALBSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-alb-sg'
+
+  WebServerSecurityGroupId:
+    Description: Web Server Security Group ID
+    Value: !Ref WebServerSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-web-sg'
+
+  AppServerSecurityGroupId:
+    Description: Application Server Security Group ID
+    Value: !Ref AppServerSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-app-sg'
+
+  DatabaseSecurityGroupId:
+    Description: Database Security Group ID
+    Value: !Ref DatabaseSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-db-sg'
+
+  BastionSecurityGroupId:
+    Description: Bastion Host Security Group ID
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-bastion-sg'

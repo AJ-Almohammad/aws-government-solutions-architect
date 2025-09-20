@@ -1,0 +1,94 @@
+[file name]: database-simple.yaml
+[file content begin]
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Government Solutions Database - Simple PostgreSQL'
+
+Parameters:
+  DBUsername:
+    Type: String
+    Default: 'dbadmin'
+    Description: 'Database username'
+    MinLength: 4
+    MaxLength: 16
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+    ConstraintDescription: 'Must begin with a letter and contain only alphanumeric characters and underscores'
+  
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: 'Database password (minimum 8 characters)'
+    MinLength: 8
+    MaxLength: 64
+    ConstraintDescription: 'Password must be at least 8 characters long'
+  
+  ProjectName:
+    Type: String
+    Default: 'gov-solutions'
+    Description: 'Project name for resource tagging'
+  
+  Environment:
+    Type: String
+    Default: 'demo'
+    AllowedValues: ['dev', 'staging', 'prod', 'demo']
+    Description: 'Environment name'
+
+Resources:
+  # Simple RDS Instance
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${ProjectName}-${Environment}-simple-db'
+      Engine: postgres
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp2
+      
+      # Use existing subnet group and security group from main stack
+      DBSubnetGroupName: 
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-db-subnet-group'
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-db-sg'
+      
+      # Credentials from parameters
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      
+      # Basic configuration
+      MultiAZ: false
+      BackupRetentionPeriod: 0
+      PubliclyAccessible: false
+      StorageEncrypted: false
+      
+      # Disable advanced features for simplicity
+      MonitoringInterval: 0
+      EnablePerformanceInsights: false
+      AutoMinorVersionUpgrade: true
+      DeletionProtection: false
+      
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-database'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+Outputs:
+  DatabaseEndpoint:
+    Description: Database Endpoint Address
+    Value: !GetAtt DatabaseInstance.Endpoint.Address
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-simple-db-endpoint'
+  
+  DatabasePort:
+    Description: Database Port
+    Value: !GetAtt DatabaseInstance.Endpoint.Port
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-simple-db-port'
+
+  DatabaseConnectionInfo:
+    Description: Database Connection Information
+    Value: !Sub 'postgresql://${DBUsername}@${DatabaseInstance.Endpoint.Address}:${DatabaseInstance.Endpoint.Port}/postgres'
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-db-connection-info'
+[file content end]

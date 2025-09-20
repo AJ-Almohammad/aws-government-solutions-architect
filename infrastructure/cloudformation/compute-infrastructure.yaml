@@ -1,0 +1,604 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Government Solutions Compute Infrastructure - Auto Scaling Web and App Tiers'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'gov-solutions'
+    Description: 'Project name for resource tagging'
+  
+  Environment:
+    Type: String
+    Default: 'demo'
+    AllowedValues: ['dev', 'staging', 'prod', 'demo']
+    Description: 'Environment name'
+
+  KeyPairName:
+    Type: String
+    Description: 'EC2 Key Pair name for SSH access (REQUIRED - no default for security)'
+    ConstraintDescription: 'Must be an existing EC2 Key Pair'
+
+  WebInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small', 't3.medium']
+    Description: 'EC2 instance type for web servers'
+
+  AppInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small', 't3.medium']
+    Description: 'EC2 instance type for app servers'
+
+  BastionInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small']
+    Description: 'EC2 instance type for bastion host'
+
+  WebMinSize:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Minimum number of web server instances'
+
+  WebMaxSize:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 20
+    Description: 'Maximum number of web server instances'
+
+  WebDesiredCapacity:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Desired number of web server instances'
+
+  AppMinSize:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Minimum number of app server instances'
+
+  AppMaxSize:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 20
+    Description: 'Maximum number of app server instances'
+
+  AppDesiredCapacity:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Desired number of app server instances'
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: 'ami-xxxxxxxxxxxxxxxxx'
+    us-west-2:
+      AMI: 'ami-xxxxxxxxxxxxxxxxx'
+    eu-central-1:
+      AMI: 'ami-xxxxxxxxxxxxxxxxx'
+    eu-west-1:
+      AMI: 'ami-xxxxxxxxxxxxxxxxx'
+
+Resources:
+  # IAM Role for EC2 Instances
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${Environment}-ec2-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-ec2-role'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${ProjectName}-${Environment}-ec2-profile'
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-alb'
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-alb-sg'
+      Subnets:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-public-subnet-1'
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-public-subnet-2'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-alb'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ALB Target Group for Web Servers
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ProjectName}-${Environment}-web-tg'
+      Port: 80
+      Protocol: HTTP
+      VpcId:
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-vpc-id'
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: 'true'
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: '86400'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-web-tg'
+
+  # ALB Listener
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Launch Template for Web Servers
+  WebLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${ProjectName}-${Environment}-web-lt'
+      LaunchTemplateData:
+        ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+        InstanceType: !Ref WebInstanceType
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile:
+          Name: !Ref EC2InstanceProfile
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-web-sg'
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            
+            # Create a simple health check endpoint
+            echo "OK" > /var/www/html/health
+            
+            # Create the enhanced portfolio page
+            cat > /var/www/html/index.html <<'EOF'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>AWS Junior Cloud Engineer - Portfolio</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    :root{--aws-orange:#FF9900;--aws-dark:#232F3E;--aws-blue:#0073BB;--aws-light-bg:#F2F2F2;--aws-card-bg:#FFFFFF;--aws-text-dark:#232F3E;--aws-text-light:#FFFFFF;--aws-success:#00CA72;--aws-border:#D5DBDB}
+                    *{margin:0;padding:0;box-sizing:border-box}
+                    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:var(--aws-light-bg);color:var(--aws-text-dark);line-height:1.6;padding:20px}
+                    .container{max-width:1200px;margin:0 auto;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);overflow:hidden}
+                    .header{background:linear-gradient(135deg,var(--aws-dark)0%,var(--aws-blue)100%);color:white;padding:30px;text-align:center}
+                    .header h1{margin:0;font-size:2.5rem;font-weight:300}
+                    .header p{margin:10px 0 0 0;font-size:1.2rem;opacity:0.9}
+                    .section{padding:30px;border-bottom:1px solid #eee}
+                    .section:last-child{border-bottom:none}
+                    .section h2{color:var(--aws-dark);font-size:1.5rem;margin-bottom:20px;padding-left:15px;border-left:4px solid var(--aws-blue)}
+                    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+                    .card{background:#f8f9fa;padding:20px;border-radius:8px;border-left:4px solid var(--aws-success)}
+                    .card h3{color:var(--aws-dark);margin-top:0}
+                    .highlight{background:#e8f5e8;padding:15px;border-radius:8px;margin:15px 0}
+                    .tech-stack{display:flex;flex-wrap:wrap;gap:10px;margin:15px 0}
+                    .tech-tag{background:var(--aws-blue);color:white;padding:5px 12px;border-radius:20px;font-size:0.9rem}
+                    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin:20px 0}
+                    .metric{text-align:center;padding:15px;background:#f1f3f4;border-radius:8px}
+                    .metric-value{font-size:2rem;font-weight:bold;color:var(--aws-blue)}
+                    .metric-label{font-size:0.9rem;color:#666;margin-top:5px}
+                    .status{color:var(--aws-success);font-weight:bold}
+                    .instance-info{font-family:'Courier New',monospace;background:#f8f9fa;padding:10px;border-radius:4px}
+                    a{color:var(--aws-blue);text-decoration:none}
+                    a:hover{text-decoration:underline}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>AWS Junior Cloud Engineer Portfolio</h1>
+                        <p>Cloud Enthusiast & AWS Learner</p>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>Target Role: AWS Junior Cloud Engineer & Junior Solutions Architect</h2>
+                        <div class="highlight">
+                            <strong>Demonstrating Foundational Cloud Infrastructure Skills</strong><br>
+                            This portfolio showcases AWS learning journey and hands-on experience with core services.
+                        </div>
+                        
+                        <div class="grid">
+                            <div class="card">
+                                <h3>Architecture Fundamentals</h3>
+                                <p><strong>✓ Multi-Tier Design:</strong> Web, Application, Database tiers</p>
+                                <p><strong>✓ High Availability:</strong> Multi-AZ deployment</p>
+                                <p><strong>✓ Auto Scaling:</strong> Basic capacity management</p>
+                                <p><strong>✓ Load Balancing:</strong> Application Load Balancer setup</p>
+                            </div>
+                            
+                            <div class="card">
+                                <h3>Security & Compliance</h3>
+                                <p><strong>✓ Security Groups:</strong> Instance-level firewall</p>
+                                <p><strong>✓ Network Isolation:</strong> Public and private subnets</p>
+                                <p><strong>✓ IAM Basics:</strong> User and role management</p>
+                                <p><strong>✓ Monitoring:</strong> CloudWatch fundamentals</p>
+                            </div>
+                            
+                            <div class="card">
+                                <h3>Infrastructure as Code</h3>
+                                <p><strong>✓ CloudFormation:</strong> Template creation</p>
+                                <p><strong>✓ Automation:</strong> Repeatable deployments</p>
+                                <p><strong>✓ Version Control:</strong> GitHub for code management</p>
+                                <p><strong>✓ Documentation:</strong> Architecture diagrams</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>Learning Path & Certifications</h2>
+                        <div class="grid">
+                            <div class="card">
+                                <h3>AWS Certifications</h3>
+                                <p><strong>✓ AWS Solutions Architect Professional</strong> (Completed)</p>
+                                <p><strong>✓ Terraform Associate</strong> (Completed)</p>
+                                <p><strong>○ AWS SysOps Administrator Associate</strong> (Planned)</p>
+                                <p><strong>Learning Resources:</strong> AWS Training, Cloud Guru, AWS Documentation</p>
+                            </div>
+                            
+                            <div class="card">
+                                <h3>Technical Skills</h3>
+                                <div class="tech-stack">
+                                    <span class="tech-tag">EC2</span>
+                                    <span class="tech-tag">S3</span>
+                                    <span class="tech-tag">VPC</span>
+                                    <span class="tech-tag">IAM</span>
+                                    <span class="tech-tag">CloudFormation</span>
+                                    <span class="tech-tag">Lambda</span>
+                                    <span class="tech-tag">RDS</span>
+                                    <span class="tech-tag">CloudWatch</span>
+                                </div>
+                                <p><strong>Other Skills:</strong> Linux, Python, Networking Fundamentals, HTML/CSS</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>Learning Progress Metrics</h2>
+                        <div class="metrics">
+                            <div class="metric">
+                                <div class="metric-value">12+</div>
+                                <div class="metric-label">Hands-on Labs Completed</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-value">85%</div>
+                                <div class="metric-label">SysOps Administrator Exam Readiness</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-value">5</div>
+                                <div class="metric-label">Projects Deployed</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-value">100+</div>
+                                <div class="metric-label">Hours of Learning</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>Current Lab Environment</h2>
+                        <div class="instance-info">
+                            <strong>Instance ID:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-id)<br>
+                            <strong>Availability Zone:</strong> $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)<br>
+                            <strong>Instance Type:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-type)<br>
+                            <strong>Status:</strong> <span class="status">Web Tier Active & Healthy</span><br>
+                            <strong>Deployment:</strong> CloudFormation Template
+                        </div>
+                        <p>This environment is built using AWS Free Tier resources for learning purposes.</p>
+                    </div>
+                    
+                    <div class="section">
+                        <h2>Learning Journey</h2>
+                        <div class="highlight">
+                            <p><strong>This portfolio demonstrates:</strong></p>
+                            <ul>
+                                <li>Fundamental understanding of core AWS services</li>
+                                <li>Ability to deploy basic cloud infrastructure</li>
+                                <li>Hands-on experience with AWS management console and CLI</li>
+                                <li>Growing knowledge of cloud security best practices</li>
+                                <li>Passion for cloud technologies and continuous learning</li>
+                            </ul>
+                            <p><strong>Learning Repository:</strong> <a href="#" target="_blank">GitHub - AWS Learning Repository</a></p>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            EOF
+            
+            # Install CloudWatch agent
+            wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/amazon_linux/amd64/latest/amazon-cloudwatch-agent.rpm
+            rpm -U ./amazon-cloudwatch-agent.rpm
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${ProjectName}-${Environment}-web-server'
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Tier
+                Value: Web
+
+  # Auto Scaling Group for Web Servers
+  WebAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub '${ProjectName}-${Environment}-web-asg'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebLaunchTemplate
+        Version: !GetAtt WebLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref WebMinSize
+      MaxSize: !Ref WebMaxSize
+      DesiredCapacity: !Ref WebDesiredCapacity
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-private-subnet-1'
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-private-subnet-2'
+      TargetGroupARNs:
+        - !Ref WebTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-web-asg'
+          PropagateAtLaunch: false
+        - Key: Environment
+          Value: !Ref Environment
+          PropagateAtLaunch: true
+
+  # Launch Template for App Servers
+  AppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${ProjectName}-${Environment}-app-lt'
+      LaunchTemplateData:
+        ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+        InstanceType: !Ref AppInstanceType
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile:
+          Name: !Ref EC2InstanceProfile
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-app-sg'
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y python3 pip
+            pip3 install flask
+            
+            # Create a simple app server
+            cat > /home/ec2-user/app.py <<EOF
+            from flask import Flask, jsonify
+            import socket
+            import os
+            
+            app = Flask(__name__)
+            
+            @app.route('/api/health')
+            def health():
+                return jsonify({
+                    'status': 'healthy',
+                    'service': 'application-tier',
+                    'instance': socket.gethostname(),
+                    'version': '1.0.0'
+                })
+            
+            @app.route('/api/info')
+            def info():
+                return jsonify({
+                    'hostname': socket.gethostname(),
+                    'environment': '${Environment}',
+                    'tier': 'application',
+                    'architecture': 'multi-az-autoscaling'
+                })
+            
+            if __name__ == '__main__':
+                app.run(host='0.0.0.0', port=8080)
+            EOF
+            
+            # Start the application
+            cd /home/ec2-user
+            nohup python3 app.py > app.log 2>&1 &
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${ProjectName}-${Environment}-app-server'
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Tier
+                Value: Application
+
+  # Auto Scaling Group for App Servers
+  AppAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub '${ProjectName}-${Environment}-app-asg'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref AppLaunchTemplate
+        Version: !GetAtt AppLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref AppMinSize
+      MaxSize: !Ref AppMaxSize
+      DesiredCapacity: !Ref AppDesiredCapacity
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-private-subnet-1'
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-private-subnet-2'
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-app-asg'
+          PropagateAtLaunch: false
+        - Key: Environment
+          Value: !Ref Environment
+          PropagateAtLaunch: true
+
+  # Bastion Host Instance
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      InstanceType: !Ref BastionInstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub '${ProjectName}-${Environment}-bastion-sg'
+      SubnetId:
+        Fn::ImportValue: !Sub '${ProjectName}-${Environment}-public-subnet-1'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y postgresql
+          
+          # Security hardening
+          echo "Protocol 2" >> /etc/ssh/sshd_config
+          echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
+          echo "ClientAliveInterval 300" >> /etc/ssh/sshd_config
+          echo "ClientAliveCountMax 2" >> /etc/ssh/sshd_config
+          systemctl restart sshd
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-bastion'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Tier
+          Value: Management
+
+  # Auto Scaling Policies for Web Tier
+  WebScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: PercentChangeInCapacity
+      AutoScalingGroupName: !Ref WebAutoScalingGroup
+      Cooldown: 300
+      ScalingAdjustment: 25
+      PolicyType: SimpleScaling
+
+  WebScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: PercentChangeInCapacity
+      AutoScalingGroupName: !Ref WebAutoScalingGroup
+      Cooldown: 300
+      ScalingAdjustment: -25
+      PolicyType: SimpleScaling
+
+  # CloudWatch Alarms for Web Tier
+  WebHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${Environment}-web-high-cpu'
+      AlarmDescription: Web tier high CPU utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref WebAutoScalingGroup
+      AlarmActions:
+        - !Ref WebScaleUpPolicy
+
+  WebLowCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-${Environment}-web-low-cpu'
+      AlarmDescription: Web tier low CPU utilization
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 25
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref WebAutoScalingGroup
+      AlarmActions:
+        - !Ref WebScaleDownPolicy
+
+Outputs:
+  ApplicationLoadBalancerDNS:
+    Description: DNS name of the Application Load Balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-compute-alb-dns'
+
+  ApplicationLoadBalancerArn:
+    Description: ARN of the Application Load Balancer
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-alb-arn'
+
+  WebAutoScalingGroupName:
+    Description: Name of the Web Auto Scaling Group
+    Value: !Ref WebAutoScalingGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-web-asg'
+
+  AppAutoScalingGroupName:
+    Description: Name of the App Auto Scaling Group
+    Value: !Ref AppAutoScalingGroup
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-app-asg'
+
+  BastionHostInstanceId:
+    Description: Instance ID of the Bastion Host
+    Value: !Ref BastionHost
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-bastion-id'
+
+  BastionPublicIP:
+    Description: Public IP address of the Bastion Host
+    Value: !GetAtt BastionHost.PublicIp
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-bastion-ip'

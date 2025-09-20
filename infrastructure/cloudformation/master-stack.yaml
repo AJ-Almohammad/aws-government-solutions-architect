@@ -1,0 +1,324 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Government Solutions Master Stack - Infrastructure Without Database'
+
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - Environment
+      - Label:
+          default: "Security Configuration"
+        Parameters:
+          - KeyPairName
+      - Label:
+          default: "Infrastructure Sizing"
+        Parameters:
+          - WebInstanceType
+          - AppInstanceType
+          - BastionInstanceType
+      - Label:
+          default: "Auto Scaling Configuration"
+        Parameters:
+          - WebMinSize
+          - WebMaxSize
+          - WebDesiredCapacity
+          - AppMinSize
+          - AppMaxSize
+          - AppDesiredCapacity
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'gov-solutions'
+    Description: 'Project name for resource tagging and naming'
+    MinLength: 3
+    MaxLength: 20
+    AllowedPattern: '[a-z][a-z0-9-]*'
+    ConstraintDescription: 'Must be 3-20 characters, start with lowercase letter, contain only lowercase letters, numbers, and hyphens'
+  
+  Environment:
+    Type: String
+    Default: 'demo'
+    AllowedValues: ['dev', 'staging', 'prod', 'demo']
+    Description: 'Environment name for resource tagging'
+
+  KeyPairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: 'REQUIRED: Select an existing EC2 Key Pair for SSH access to instances'
+    ConstraintDescription: 'Must be an existing EC2 Key Pair in this region'
+
+  WebInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small', 't3.medium', 't3.large']
+    Description: 'EC2 instance type for web servers'
+
+  AppInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small', 't3.medium', 't3.large']
+    Description: 'EC2 instance type for application servers'
+
+  BastionInstanceType:
+    Type: String
+    Default: 't3.micro'
+    AllowedValues: ['t3.micro', 't3.small', 't3.medium']
+    Description: 'EC2 instance type for bastion host'
+
+  WebMinSize:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Minimum number of web server instances'
+
+  WebMaxSize:
+    Type: Number
+    Default: 6
+    MinValue: 2
+    MaxValue: 20
+    Description: 'Maximum number of web server instances'
+
+  WebDesiredCapacity:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Desired number of web server instances'
+
+  AppMinSize:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Minimum number of application server instances'
+
+  AppMaxSize:
+    Type: Number
+    Default: 6
+    MinValue: 2
+    MaxValue: 20
+    Description: 'Maximum number of application server instances'
+
+  AppDesiredCapacity:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: 'Desired number of application server instances'
+
+Resources:
+  # 1. VPC Foundation (First - Creates networking foundation)
+  VPCFoundationStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 'https://s3.amazonaws.com/BUCKET-NAME-PLACEHOLDER/vpc-foundation.yaml'
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-vpc-stack'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: StackType
+          Value: 'VPC Foundation'
+
+  # 2. Security Groups (Second - Depends on VPC)
+  SecurityGroupsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCFoundationStack
+    Properties:
+      TemplateURL: 'https://s3.amazonaws.com/BUCKET-NAME-PLACEHOLDER/security-groups.yaml'
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-security-stack'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: StackType
+          Value: 'Security Groups'
+
+  # 3. Compute Infrastructure (Third - Depends on VPC and Security Groups)
+  ComputeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: 
+      - VPCFoundationStack
+      - SecurityGroupsStack
+    Properties:
+      TemplateURL: 'https://s3.amazonaws.com/BUCKET-NAME-PLACEHOLDER/compute-infrastructure.yaml'
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        KeyPairName: !Ref KeyPairName
+        WebInstanceType: !Ref WebInstanceType
+        AppInstanceType: !Ref AppInstanceType
+        BastionInstanceType: !Ref BastionInstanceType
+        WebMinSize: !Ref WebMinSize
+        WebMaxSize: !Ref WebMaxSize
+        WebDesiredCapacity: !Ref WebDesiredCapacity
+        AppMinSize: !Ref AppMinSize
+        AppMaxSize: !Ref AppMaxSize
+        AppDesiredCapacity: !Ref AppDesiredCapacity
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-${Environment}-compute-stack'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: StackType
+          Value: 'Compute Infrastructure'
+
+  # CloudWatch Dashboard for Monitoring
+  InfrastructureDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${ProjectName}-${Environment}-infrastructure'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${ComputeStack.Outputs.ApplicationLoadBalancerArn}" ],
+                  [ ".", "TargetResponseTime", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Load Balancer Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/AutoScaling", "GroupDesiredCapacity", "AutoScalingGroupName", "${ComputeStack.Outputs.WebAutoScalingGroupName}" ],
+                  [ ".", "GroupInServiceInstances", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Web Tier Auto Scaling",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "${ComputeStack.Outputs.WebAutoScalingGroupName}" ],
+                  [ "...", "${ComputeStack.Outputs.AppAutoScalingGroupName}" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "EC2 CPU Utilization",
+                "period": 300
+              }
+            }
+          ]
+        }
+
+Outputs:
+  # Master Stack Information
+  MasterStackId:
+    Description: Master Stack ID
+    Value: !Ref 'AWS::StackId'
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-master-stack-id'
+
+  MasterStackName:
+    Description: Master Stack Name
+    Value: !Ref 'AWS::StackName'
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-master-stack-name'
+
+  # Application Access
+  ApplicationURL:
+    Description: Application Load Balancer URL
+    Value: !Sub 'http://${ComputeStack.Outputs.ApplicationLoadBalancerDNS}'
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-application-url'
+
+  ApplicationLoadBalancerDNS:
+    Description: Application Load Balancer DNS Name
+    Value: !GetAtt ComputeStack.Outputs.ApplicationLoadBalancerDNS
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-alb-dns'
+
+  # Security Access
+  BastionHostIP:
+    Description: Bastion Host Public IP
+    Value: !GetAtt ComputeStack.Outputs.BastionPublicIP
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-bastion-public-ip'
+
+  # Monitoring
+  CloudWatchDashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub 'https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${InfrastructureDashboard}'
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-dashboard-url'
+
+  # Architecture Information
+  VPCId:
+    Description: VPC ID
+    Value: !GetAtt VPCFoundationStack.Outputs.VPCId
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-vpc-id-master'
+
+  # Cost Estimation
+  EstimatedMonthlyCost:
+    Description: Estimated monthly AWS cost (USD) for current configuration
+    Value: !Sub |
+      Web Servers (${WebDesiredCapacity} x ${WebInstanceType}): ~$20/month
+      App Servers (${AppDesiredCapacity} x ${AppInstanceType}): ~$20/month
+      Load Balancer: ~$18/month
+      NAT Gateway: ~$45/month
+      Bastion Host: ~$10/month
+      Total Estimated: ~$113/month
+      
+      Note: Costs vary by region and usage. Database can be added separately.
+
+  # Security Information
+  SecurityCompliance:
+    Description: Security features implemented
+    Value: |
+      ✓ Multi-AZ deployment for high availability
+      ✓ Defense-in-depth security groups
+      ✓ Bastion host for secure administrative access
+      ✓ Auto Scaling for resilience
+      ✓ CloudWatch monitoring and alerting
+      ✓ Load balancer with health checks
+      ✓ Private subnets for application tiers
+
+  # Deployment Information
+  DeploymentInstructions:
+    Description: Next steps after deployment
+    Value: |
+      1. Access application: Use ApplicationURL output
+      2. SSH to instances: Connect via Bastion Host (BastionHostIP)
+      3. Monitor infrastructure: Use CloudWatch Dashboard URL
+      4. Scaling: Auto Scaling is configured with CloudWatch alarms
+      5. Database: Can be added as separate stack later
+      
+      For cleanup: Delete this stack to remove all resources and avoid charges.

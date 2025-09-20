@@ -91,7 +91,18 @@ Architecture](images/disaster_recovery_architecture.png)
 | Storage | $18,000 | $12,000 | $6,000 |
 | Database | $15,000 | $8,000 | $7,000 |
 | Network | $10,000 | $6,200 | $3,800 |
-| **TOTAL** | **$68,000** | **$41,200** | **$27,200** |
+| **Subtotal** | **$68,000** | **$41,200** | **$26,800** |
+| *Security (New Investment)* | *$0* | *$4,500* | *-$4,500* |
+| **TOTAL** | **$68,000** | **$45,700** | **$22,300** |
+
+*Note: The modernized architecture includes a new $4,500/month investment in advanced security services (AWS GuardDuty, Security Hub, etc.), which is essential for meeting FedRAMP compliance. The net savings is $22,300 per month (33% reduction).*
+
+### **Projected Financial Impact**
+- **Monthly Savings:** **$22,300**
+- **Annual Savings:** **$267,600**
+- **5-Year Savings:** **$1,338,000**
+- **Implementation Investment:** **$225,000** (one-time)
+- **5-Year Return on Investment (ROI):** **594%**
 
 ### **Cost Optimization Techniques**
 - **Reserved Instances:** 70% coverage for predictable workloads
@@ -134,8 +145,8 @@ tasks
 **Impact:** Complex architecture but optimal cost and performance
 
 ---
-*Document Version: 1.0*  
-*Created: September 15, 2025*  
+*Document Version: 1.1*  
+*Last Revised: September 19, 2025*  
 *Architect: Amer Almohammad*  
 *Reviewed: Technical Architecture Board*  
 *Approved: Sarah Johnson (CTO)*

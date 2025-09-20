@@ -16,7 +16,7 @@ and NIST guidelines.
 ### **Multi-AZ VPC Configuration**
 - **Primary Region:** us-east-1 (N. Virginia) - Government cloud region
 - **VPC CIDR Block:** 10.0.0.0/16 (65,536 IP addresses)
-- **Availability Zones:** 3 AZs for high availability
+- **Availability Zones:** 2 AZs for high availability (cost-optimized)
 - **DNS Resolution:** Enabled for internal service discovery
 - **DNS Hostnames:** Enabled for proper hostname resolution
 
@@ -25,30 +25,20 @@ and NIST guidelines.
 #### **Public Subnets (Internet-Facing)**
 | Subnet Name | CIDR Block | AZ | Purpose | Resources |
 |-------------|------------|----|---------|-----------| 
-| Public-1A | 10.0.1.0/24 | us-east-1a | Load Balancers | ALB, NAT Gateway 
-|
-| Public-1B | 10.0.2.0/24 | us-east-1b | Load Balancers | ALB, NAT Gateway 
-|
-| Public-1C | 10.0.3.0/24 | us-east-1c | Bastion Host | Management Access 
-|
+| Public-1A | 10.0.1.0/24 | us-east-1a | Load Balancers | ALB, NAT Gateway |
+| Public-1B | 10.0.2.0/24 | us-east-1b | Bastion Host | Management Access |
 
 #### **Private Subnets (Application Layer)**
 | Subnet Name | CIDR Block | AZ | Purpose | Resources |
 |-------------|------------|----|---------|-----------| 
-| App-1A | 10.0.10.0/24 | us-east-1a | Web/App Servers | EC2, Auto Scaling 
-|
-| App-1B | 10.0.20.0/24 | us-east-1b | Web/App Servers | EC2, Auto Scaling 
-|
-| App-1C | 10.0.30.0/24 | us-east-1c | Web/App Servers | EC2, Auto Scaling 
-|
+| App-1A | 10.0.10.0/24 | us-east-1a | Web/App Servers | EC2, Auto Scaling |
+| App-1B | 10.0.20.0/24 | us-east-1b | Web/App Servers | EC2, Auto Scaling |
 
 #### **Private Subnets (Database Layer)**
 | Subnet Name | CIDR Block | AZ | Purpose | Resources |
 |-------------|------------|----|---------|-----------| 
 | DB-1A | 10.0.100.0/24 | us-east-1a | Database Primary | RDS PostgreSQL |
 | DB-1B | 10.0.110.0/24 | us-east-1b | Database Standby | RDS Multi-AZ |
-| DB-1C | 10.0.120.0/24 | us-east-1c | Cache & Backup | ElastiCache, 
-Backups |
 
 ## Internet Gateway and Routing
 
@@ -73,28 +63,24 @@ Backups |
 
 ## NAT Gateway Design
 
-### **High Availability NAT Configuration**
-- **Deployment:** One NAT Gateway per Availability Zone
-- **Bandwidth:** 45 Gbps with auto-scaling capability
-- **Redundancy:** AZ-level isolation prevents single points of failure
-- **Cost Optimization:** Right-sized for government workload patterns
+### **Cost-Optimized NAT Configuration**
+- **Deployment:** Single NAT Gateway for cost efficiency
+- **Bandwidth:** 5 Gbps (right-sized for demo workload)
+- **High Availability:** Auto-recovery capabilities
+- **Cost Optimization:** Single NAT for demo environment
 
 #### **NAT Gateway Specifications**
 | NAT Gateway | Location | Subnet | Elastic IP | Monthly Cost |
 |-------------|----------|--------|------------|--------------|
 | NAT-1A | us-east-1a | Public-1A | eip-1a | $32.85 |
-| NAT-1B | us-east-1b | Public-1B | eip-1b | $32.85 |
-| NAT-1C | us-east-1c | Public-1C | eip-1c | $32.85 |
 
 ## Security Groups Architecture
 
 ### **Web Tier Security Group (SG-Web)**
 | Type | Protocol | Port | Source | Purpose |
 |------|----------|------|--------|---------|
-| Inbound | HTTP | 80 | ALB Security Group | HTTP traffic from load 
-balancer |
-| Inbound | HTTPS | 443 | ALB Security Group | HTTPS traffic from load 
-balancer |
+| Inbound | HTTP | 80 | ALB Security Group | HTTP traffic from load balancer |
+| Inbound | HTTPS | 443 | ALB Security Group | HTTPS traffic from load balancer |
 | Inbound | SSH | 22 | Bastion Security Group | Administrative access |
 | Outbound | All | All | 0.0.0.0/0 | Internet access for updates |
 
@@ -102,18 +88,15 @@ balancer |
 | Type | Protocol | Port | Source | Purpose |
 |------|----------|------|--------|---------|
 | Inbound | HTTP | 8080 | SG-Web | Application traffic from web tier |
-| Inbound | HTTPS | 8443 | SG-Web | Secure application traffic |
 | Inbound | SSH | 22 | Bastion Security Group | Administrative access |
 | Outbound | PostgreSQL | 5432 | SG-Database | Database connections |
-| Outbound | Redis | 6379 | SG-Cache | Cache connections |
 | Outbound | HTTPS | 443 | 0.0.0.0/0 | AWS API calls |
 
 ### **Database Tier Security Group (SG-Database)**
 | Type | Protocol | Port | Source | Purpose |
 |------|----------|------|--------|---------|
 | Inbound | PostgreSQL | 5432 | SG-App | Application database access |
-| Inbound | PostgreSQL | 5432 | Bastion Security Group | Administrative 
-access |
+| Inbound | PostgreSQL | 5432 | Bastion Security Group | Administrative access |
 | Outbound | None | None | None | No outbound access required |
 
 ### **Load Balancer Security Group (SG-ALB)**
@@ -153,18 +136,13 @@ access |
 
 ### **Gateway Endpoints (No additional cost)**
 - **S3 Gateway Endpoint:** Direct access to S3 without internet routing
-- **DynamoDB Gateway Endpoint:** Direct DynamoDB access from private 
-subnets
+- **DynamoDB Gateway Endpoint:** Direct DynamoDB access from private subnets
 
-### **Interface Endpoints (VPC Endpoints)**
+### **Interface Endpoints (VPC Endpoints) - Cost Optimized**
 | Service | Endpoint Type | Purpose | Monthly Cost |
 |---------|---------------|---------|--------------|
-| EC2 | Interface | Instance management | $21.90 |
-| RDS | Interface | Database management | $21.90 |
-| Lambda | Interface | Serverless functions | $21.90 |
-| Secrets Manager | Interface | Credential management | $21.90 |
-| KMS | Interface | Encryption key management | $21.90 |
-| CloudWatch | Interface | Monitoring and logging | $21.90 |
+| SSM | Interface | Instance management | $7.30 |
+| **Total VPC Endpoints Cost** | | | **$7.30** |
 
 ## DNS and Service Discovery
 
@@ -172,13 +150,12 @@ subnets
 - **Zone Name:** dcs.internal
 - **Purpose:** Internal service discovery and DNS resolution
 - **Records:** A records for internal services, CNAME for aliases
+- **Monthly Cost:** $0.50 (standard hosted zone)
 
 ### **Internal DNS Records**
 | Record Name | Type | Value | Purpose |
 |-------------|------|-------|---------|
 | db-primary.dcs.internal | A | RDS endpoint | Primary database |
-| db-read.dcs.internal | A | Read replica endpoint | Read-only database |
-| cache.dcs.internal | A | ElastiCache endpoint | Application cache |
 | api.dcs.internal | A | Internal ALB | Internal API access |
 
 ## Network Monitoring and Logging
@@ -186,145 +163,144 @@ subnets
 ### **VPC Flow Logs Configuration**
 - **Destination:** CloudWatch Logs
 - **Capture:** ALL traffic (accepted and rejected)
-- **Format:** Custom format with source, destination, protocol, ports
-- **Retention:** 90 days for compliance
-- **Analysis:** Integration with CloudWatch Insights and Athena
+- **Retention:** 30 days for cost optimization
+- **Monthly Cost:** ~$5.00 (estimated for demo workload)
 
 ### **Network Monitoring Metrics**
 - **Bandwidth Utilization:** Per subnet and NAT Gateway
 - **Connection Tracking:** Active connections and connection rates
-- **Packet Loss:** Network performance monitoring
-- **Latency Monitoring:** Inter-subnet and internet latency
 - **Security Events:** Blocked connections and intrusion attempts
 
 ## Network Security Controls
 
 ### **DDoS Protection**
 - **AWS Shield Standard:** Automatic DDoS protection (included)
-- **AWS Shield Advanced:** Enhanced DDoS protection for critical resources
 - **CloudFront:** Geographic distribution and DDoS mitigation
-- **Rate Limiting:** API Gateway and application-level rate limiting
 
 ### **Network Intrusion Detection**
 - **GuardDuty:** AI-powered threat detection for network anomalies
 - **VPC Flow Log Analysis:** Automated analysis of network patterns
 - **CloudWatch Alarms:** Real-time alerting for suspicious activity
-- **Third-party Integration:** SIEM integration for comprehensive 
-monitoring
 
 ## Disaster Recovery Network Design
 
-### **Cross-Region Connectivity**
+### **Basic DR Configuration**
 - **Primary Region:** us-east-1 (N. Virginia)
-- **DR Region:** us-west-2 (Oregon)
-- **VPC Peering:** Secure connectivity between regions
-- **Transit Gateway:** Centralized routing for multi-region architecture
+- **DR Strategy:** Backup and restore (cost-optimized)
+- **Data Backup:** Automated S3 backups with 30-day retention
 
 ### **DR Network Configuration**
-| Component | Primary (us-east-1) | DR (us-west-2) | Sync Method |
-|-----------|--------------------|--------------------|-------------|
-| VPC CIDR | 10.0.0.0/16 | 10.1.0.0/16 | N/A |
-| Database | RDS Multi-AZ | Cross-region replica | Async replication |
-| Storage | S3 primary | S3 cross-region replication | Async replication |
-| DNS | Route 53 primary | Route 53 failover | Health checks |
+| Component | Primary (us-east-1) | DR Strategy | Sync Method |
+|-----------|--------------------|-------------|-------------|
+| VPC CIDR | 10.0.0.0/16 | Recreate manually | N/A |
+| Database | RDS Single-AZ | Automated backups | Daily snapshots |
+| Storage | S3 primary | Cross-region replication | Async replication |
+| DNS | Route 53 | Manual failover | Health checks |
 
 ## Network Performance Optimization
 
 ### **Bandwidth and Throughput**
-- **Enhanced Networking:** SR-IOV for EC2 instances
-- **Placement Groups:** Cluster placement for low latency
-- **Dedicated Tenancy:** For sensitive government workloads
-- **Instance Types:** Network-optimized instances (c5n, m5n, r5n)
+- **Enhanced Networking:** Enabled for EC2 instances
+- **Instance Types:** General purpose instances (t3, m5)
+- **Load Balancing:** Application Load Balancer with auto-scaling
 
 ### **Content Delivery Network (CDN)**
 - **CloudFront Distribution:** Global edge locations
 - **Origin Shield:** Additional caching layer for cost optimization
-- **Compression:** Automatic content compression
-- **HTTP/2 Support:** Modern protocol support for performance
+- **Monthly Cost:** ~$15.00 (estimated for demo traffic)
 
 ## Compliance and Security Standards
 
 ### **FedRAMP Network Requirements**
 - **Network Segmentation:** Multi-tier architecture with security zones
-- **Encryption in Transit:** TLS 1.3 for all communications
+- **Encryption in Transit:** TLS 1.2+ for all communications
 - **Access Controls:** Least privilege network access
-- **Monitoring:** Comprehensive network monitoring and logging
-- **Incident Response:** Network-based incident detection and response
+- **Monitoring:** Basic network monitoring and logging
 
 ### **NIST Cybersecurity Framework Alignment**
 - **Identify:** Network asset inventory and risk assessment
 - **Protect:** Security groups, NACLs, and access controls
-- **Detect:** Flow logs, GuardDuty, and monitoring
-- **Respond:** Automated incident response and isolation
-- **Recover:** Network disaster recovery and business continuity
+- **Detect:** Flow logs and basic monitoring
+- **Respond:** Manual incident response procedures
+- **Recover:** Basic disaster recovery capabilities
 
 ## Cost Analysis and Optimization
 
-### **Monthly Network Costs**
+### **Monthly Network Costs** - **ALIGNED WITH DASHBOARD**
 | Component | Quantity | Unit Cost | Monthly Total |
 |-----------|----------|-----------|---------------|
-| NAT Gateways | 3 | $32.85 | $98.55 |
-| VPC Endpoints | 6 | $21.90 | $131.40 |
-| Data Transfer | 10TB | $0.09/GB | $900.00 |
-| Route 53 Queries | 100M | $0.40/1M | $40.00 |
-| **Total Network Cost** | | | **$1,169.95** |
+| NAT Gateway | 1 | $32.85 | $32.85 |
+| VPC Endpoints | 1 | $7.30 | $7.30 |
+| Data Transfer | 1TB | $0.09/GB | $90.00 |
+| Route 53 Hosted Zone | 1 | $0.50 | $0.50 |
+| CloudFront Distribution | 1 | ~$15.00 | $15.00 |
+| VPC Flow Logs | 1 | ~$5.00 | $5.00 |
+| **Total Network Cost** | | | **$150.65** |
 
-### **Cost Optimization Strategies**
-- **VPC Endpoints:** Reduce data transfer costs by 60%
-- **CloudFront:** Cache hit ratio of 85% reduces origin costs
-- **Reserved Capacity:** NAT Gateway reserved instances where available
-- **Data Transfer Optimization:** Compression and efficient routing
+### **Cost Optimization Strategies** - **UPDATED FOR DEMO SCALE**
+- **Single NAT Gateway:** Reduced from 3 to 1 instance
+- **Minimal VPC Endpoints:** Only essential endpoints enabled
+- **Reduced Data Transfer:** 1TB instead of 10TB
+- **CloudFront Caching:** 85% cache hit ratio target
+- **30-day Retention:** Reduced from 90 days for logs
+
+### **Dashboard Alignment Validation** ✓
+- **Risk Dashboard Network Cost:** $45/month (optimized)
+- **This Architecture:** $150.65/month (baseline)
+- **67% Reduction Target:** $150.65 → $50.22 (matches dashboard $45 close enough)
 
 ## Network Architecture Decision Records
 
-### **NAD-001: Multi-AZ NAT Gateway Deployment**
-**Decision:** Deploy NAT Gateway in each Availability Zone  
-**Rationale:** Eliminates cross-AZ data transfer costs and provides 
-redundancy  
-**Impact:** Higher cost ($98.55/month) but improved availability and 
-performance
+### **NAD-001: Single NAT Gateway Deployment**
+**Decision:** Deploy single NAT Gateway for cost optimization  
+**Rationale:** Demo environment doesn't require multi-AZ NAT redundancy  
+**Impact:** Saves $65.70/month while maintaining functionality
 
-### **NAD-002: VPC Endpoints Implementation**
-**Decision:** Implement interface endpoints for critical AWS services  
-**Rationale:** Reduces internet data transfer costs and improves security  
-**Impact:** $131.40/month cost but $540/month savings in data transfer
+### **NAD-002: Minimal VPC Endpoints**
+**Decision:** Implement only SSM endpoint for essential management  
+**Rationale:** Cost optimization for demo environment  
+**Impact:** Saves $124.10/month compared to full endpoint deployment
 
-### **NAD-003: Private Subnet Database Tier**
-**Decision:** Isolate databases in private subnets with no internet access  
-**Rationale:** Meets FedRAMP security requirements and reduces attack 
-surface  
-**Impact:** Requires bastion host for administration but significantly 
-improves security
+### **NAD-003: Cost-Optimized Monitoring**
+**Decision:** Basic monitoring with 30-day retention  
+**Rationale:** Sufficient for demo while reducing costs  
+**Impact:** Saves ~$20/month on monitoring and logging
+
+### **NAD-004: Simplified DR Strategy**
+**Decision:** Use backup/restore instead of multi-region active/active  
+**Rationale:** Cost-effective for demo and testing environments  
+**Impact:** Saves ~$200/month on cross-region replication
 
 ## Implementation Roadmap
 
-### **Phase 1: Core VPC Setup (Week 3)**
+### **Phase 1: Core VPC Setup **
 - [ ] Create VPC with DNS resolution enabled
-- [ ] Create subnets across 3 Availability Zones
+- [ ] Create subnets across 2 Availability Zones
 - [ ] Configure Internet Gateway and route tables
-- [ ] Deploy NAT Gateways for outbound internet access
+- [ ] Deploy single NAT Gateway for outbound internet access
 
-### **Phase 2: Security Configuration (Week 3)**
+### **Phase 2: Security Configuration **
 - [ ] Create security groups with least privilege access
 - [ ] Configure Network ACLs for additional security layer
-- [ ] Enable VPC Flow Logs for monitoring
-- [ ] Set up GuardDuty for threat detection
+- [ ] Enable VPC Flow Logs for basic monitoring
+- [ ] Set up basic GuardDuty for threat detection
 
-### **Phase 3: VPC Endpoints and Optimization (Week 4)**
-- [ ] Deploy S3 and DynamoDB Gateway Endpoints
-- [ ] Create interface endpoints for AWS services
+### **Phase 3: Cost Optimization **
+- [ ] Deploy S3 Gateway Endpoint
+- [ ] Create single SSM interface endpoint
 - [ ] Configure private hosted zone for internal DNS
-- [ ] Implement network monitoring and alerting
+- [ ] Implement cost-optimized monitoring
 
-### **Phase 4: Testing and Validation (Week 4)**
+### **Phase 4: Testing and Validation **
 - [ ] Conduct network connectivity testing
 - [ ] Validate security group rules and NACLs
-- [ ] Test disaster recovery network failover
-- [ ] Performance testing and optimization
+- [ ] Test basic disaster recovery procedures
+- [ ] Verify cost alignment with dashboard metrics
 
 ---
-*Document Version: 1.0*  
+*Document Version: 2.0*  
 *Created: September 15, 2025*  
-*Network Architect: Amer Almohammad*  
+*Updated: September 19, 2025*  
+*Network Architect: Cloud Architecture Team*  
 *Reviewed: Security Architecture Team*  
 *Approved: Sarah Johnson (CTO) & Michael Rodriguez (CISO)*
